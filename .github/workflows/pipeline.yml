@@ -1,0 +1,58 @@
+# .github/workflows/pipeline.yml
+name: pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run the tests
+        shell: bash
+        run: |
+          python -m unittest discover -s tests -v 2>&1 | tee test-results.txt
+
+      - name: Write test results to the run summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Test results"
+            echo ""
+            if [ -f test-results.txt ]; then
+              echo '```'
+              cat test-results.txt
+              echo '```'
+            else
+              echo "The tests did not run, so there are no results."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build the dist folder
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp app/*.py dist/
+          echo "Commit: ${{ github.sha }}" > dist/BUILD_INFO.txt
+
+      - name: Upload dist as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pantry-app
+          path: dist/
